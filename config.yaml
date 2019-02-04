@@ -1,1 +1,12 @@
-camera_calibration: {dist: 0, mtx: 0, ret: 0, rvecs: 0, tvecs: 0, x_points: 9, y_points: 5}
+# Camera Calibration
+x_points: 9
+y_points: 6
+calibration_filepath: "camera_cal/calibration.p"
+
+# Thresholding
+sobel_thresh: [150, 200]
+schannel_thresh: [20, 100]
+
+# Perspective transform
+trapezoid: [[150, 680], [580, 430], [700, 430], [1130, 680]]
+dest_points: [[200, 720], [300, 0], [1050, 0], [1080, 720]]

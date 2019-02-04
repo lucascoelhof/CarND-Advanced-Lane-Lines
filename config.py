@@ -37,4 +37,4 @@ def set(var_name, var_value):
 
 def save():
     with open(_filepath, "w") as stream:
-        yaml.dump(_config, stream)
+        yaml.dump(_config, stream, default_flow_style=False)
