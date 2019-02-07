@@ -3,14 +3,14 @@ import numpy as np
 import cv2
 
 
-def pipeline(img, s_thresh=[50, 200], sx_thresh=[20, 100]):
+def pipeline(img, s_thresh=[50, 200], sx_thresh=[20, 100], sobel_kernel=3):
     img = np.copy(img)
     # Convert to HLS color space and separate the V channel
     hls = cv2.cvtColor(img, cv2.COLOR_RGB2HLS)
     l_channel = hls[:, :, 1]
     s_channel = hls[:, :, 2]
     # Sobel x
-    sobelx = cv2.Sobel(l_channel, cv2.CV_64F, 1, 0)  # Take the derivative in x
+    sobelx = cv2.Sobel(l_channel, cv2.CV_64F, 1, 0, ksize=sobel_kernel)  # Take the derivative in x
     abs_sobelx = np.absolute(sobelx)  # Absolute x derivative to accentuate lines away from horizontal
     scaled_sobel = np.uint8(255 * abs_sobelx / np.max(abs_sobelx))
 

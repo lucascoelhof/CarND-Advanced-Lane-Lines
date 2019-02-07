@@ -8,5 +8,6 @@ def transform(img):
     src = np.float32(config.get("trapezoid"))
     dest = np.float32(config.get("dest_points"))
     m = cv2.getPerspectiveTransform(src, dest)
+    minv = cv2.getPerspectiveTransform(dest, src)
     warped = cv2.warpPerspective(img, m, img_size, flags=cv2.INTER_NEAREST)
-    return warped
+    return warped, m, minv

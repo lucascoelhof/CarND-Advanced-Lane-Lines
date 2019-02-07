@@ -5,6 +5,7 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 import config
+import collections
 
 
 # Define a class to receive the characteristics of each line detection
@@ -18,6 +19,8 @@ class Line:
         self.bestx = None
         # polynomial coefficients averaged over the last n iterations
         self.best_fit = None
+        # historical fits
+        self.hist_fit = collections.deque(maxlen=30)
         # polynomial coefficients for the most recent fit
         self.current_fit = [np.array([False])]
         # radius of curvature of the line in some units
@@ -36,6 +39,7 @@ class Lane:
     left = Line()
     right = Line()
     car_position = 0
+    average_radius = 0
 
 
 def find_lane_pixels(binary_warped):
@@ -120,23 +124,40 @@ def find_lane_pixels(binary_warped):
     return leftx, lefty, rightx, righty, out_img
 
 
-def find_curvature(img_shape):
-    ym_per_pix = config.get("ym_per_pix")
+def update_curvature(img_shape):
+    bondary_lenght = config.get("bondary_lenght")
+    ym_per_pix = bondary_lenght / img_shape[0]
     left_y = img_shape[0]
     right_y = img_shape[0]
     left_curverad = ((1 + (2 * Lane.left.current_fit[0] * left_y * ym_per_pix + Lane.left.current_fit[1]) ** 2) ** 1.5) / np.absolute(
         2 * Lane.left.current_fit[0])
     right_curverad = ((1 + (2 * Lane.right.current_fit[0] * right_y * ym_per_pix + Lane.right.current_fit[1]) ** 2) ** 1.5) / np.absolute(
         2 * Lane.right.current_fit[0])
+    Lane.left.radius_of_curvature = left_curverad
+    Lane.right.radius_of_curvature = right_curverad
+    Lane.average_radius = (left_curverad + right_curverad)/2
     return left_curverad, right_curverad
 
 
 def find_car_position(img_shape):
-    xm_per_pix = config.get("xm_per_pix")
+    lane_width = config.get("lane_width")
+    xm_per_pix = lane_width/(Lane.left.recent_xfitted[0] - Lane.right.recent_xfitted[0])
     return ((Lane.left.recent_xfitted[0] + Lane.right.recent_xfitted[0])/2 - img_shape[1]/2) * xm_per_pix
 
 
-def fit_polynomial(binary_warped):
+def find_best_fit():
+    avg = np.zeros_like(Lane.left.current_fit)
+    for fit in Lane.left.hist_fit:
+        avg = np.add(fit, avg)
+    Lane.left.best_fit = avg / len(Lane.left.hist_fit)
+
+    avg = np.zeros_like(Lane.right.current_fit)
+    for fit in Lane.right.hist_fit:
+        avg = np.add(fit, avg)
+    Lane.right.best_fit = avg / len(Lane.right.hist_fit)
+
+
+def fit_polynomial(binary_warped, undist, minv):
     # Find our lane pixels first
 
     img_shape = binary_warped.shape
@@ -145,14 +166,19 @@ def fit_polynomial(binary_warped):
     Lane.left.current_fit = np.polyfit(lefty, leftx, 2)
     Lane.right.current_fit = np.polyfit(righty, rightx, 2)
 
+    Lane.left.hist_fit.append(Lane.left.current_fit)
+    Lane.right.hist_fit.append(Lane.right.current_fit)
+
+    find_best_fit()
+
     Lane.right.recent_xfitted = rightx
     Lane.left.recent_xfitted = leftx
 
     # Generate x and y values for plotting
     ploty = np.linspace(0, binary_warped.shape[0] - 1, binary_warped.shape[0])
     try:
-        left_fitx = Lane.left.current_fit[0] * ploty ** 2 + Lane.left.current_fit[1] * ploty + Lane.left.current_fit[2]
-        right_fitx = Lane.right.current_fit[0] * ploty ** 2 + Lane.right.current_fit[1] * ploty + Lane.right.current_fit[2]
+        left_fitx = Lane.left.best_fit[0] * ploty ** 2 + Lane.left.best_fit[1] * ploty + Lane.left.best_fit[2]
+        right_fitx = Lane.right.best_fit[0] * ploty ** 2 + Lane.right.best_fit[1] * ploty + Lane.right.best_fit[2]
     except TypeError:
         # Avoids an error if `left` and `right_fit` are still none or incorrect
         print('The function failed to fit a line!')
@@ -163,11 +189,24 @@ def fit_polynomial(binary_warped):
     out_img[lefty, leftx] = [255, 0, 0]
     out_img[righty, rightx] = [0, 0, 255]
 
-    # Plots the left and right polynomials on the lane lines
-    plt.plot(left_fitx, ploty, color='yellow')
-    plt.plot(right_fitx, ploty, color='yellow')
-
-    Lane.left.radius_of_curvature, Lane.right.radius_of_curvature = find_curvature(img_shape)
+    update_curvature(img_shape)
     Lane.car_position = find_car_position(img_shape)
 
-    return out_img
+    # Create an image to draw the lines on
+    warp_zero = np.zeros_like(binary_warped).astype(np.uint8)
+    color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
+
+    # Recast the x and y points into usable format for cv2.fillPoly()
+    pts_left = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
+    pts_right = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
+    pts = np.hstack((pts_left, pts_right))
+
+    # Draw the lane onto the warped blank image
+    cv2.fillPoly(color_warp, np.int_([pts]), (0, 255, 0))
+
+    # Warp the blank back to original image space using inverse perspective matrix (Minv)
+    newwarp = cv2.warpPerspective(color_warp, minv, (undist.shape[1], undist.shape[0]))
+    # Combine the result with the original image
+    result = cv2.addWeighted(undist, 1, newwarp, 0.3, 0)
+
+    return result
