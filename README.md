@@ -14,20 +14,20 @@ You can find a result video [here](https://youtu.be/uV5FKq-Id6s)
     * [Thresholded binary image](#thresholded-binary-image)
     * [Perspective transform](#perspective-transform)
     * [Detecting lane pixels](#detecting-lane-pixels)
-    * [Warping to original image](#warping-to-original-image)
+    * [Warping to original image](#warping-to-the-original-image)
     * [Parameters](#parameters)
 * [Try it yourself](#try-it-yourself)
 
 ---
 ## Camera calibration
 
-The first, and very important step in our image processing pipeline is camera calibration.
+The first and very important step in our image processing pipeline is camera calibration.
 This is a step sometimes neglected, but very important to have consistent and correct images.
 Cameras are made with lenses, and because they do not represent a perfect pinhole model, their lenses
 distort the formed image. However, using camera calibration, we can evaluate this distortion and apply
 an undistortion to the image.
 
-One of ways to calibrate an camera is to prepare a chessboard pattern and take multiple pictures of it, in many
+One of the ways to calibrate a camera is to prepare a chessboard pattern and take multiple pictures of it, in many
 different angles and positions. You can find these pictures in folder ```camera_cal```. Then assuming (x,y,z) coordinates
 for the chessboard corners and that it is fixed on plane where z=0, we use we use cv2.findChessboardCorners
 to find the correspondent corners in the image and cv2.calibrateCamera to match camera 
@@ -47,10 +47,10 @@ With the camera calibration parameters on hand, now we should undistort the imag
 reload the parameters from ```calibration.p```, then use cv2.undistort to get the image.
 
 
-Distorced image:
+Distorted image:
 ![Example frame](camera_cal/calibration1.jpg "Distorced image")
 
-Undistorced image:
+Undistorted image:
 ![Example frame](report_images/undist_calibration1.jpg "Undistorced image")
 
 ---
@@ -63,16 +63,16 @@ Now, we will go through each step ran at every frame of the video. We start with
 
 
 ### Thresholded binary image
-After undistorting the image, we then proceed to creating a binary thresholded image. In this step, we transform the
-video frame into a binary image (either white or black). We do so in order to get a easier to treat image for the following
-steps. The first step is to calcuate the HSL representation of the image. HSL (hue, saturation and lightness)
-is a other way to represent color spaces, other than RBG. We use the S channel because it is immune to lightness and color
+After undistorting the image, we then proceed to create a binary thresholded image. In this step, we transform the
+video frame into a binary image (either white or black). We do so in order to get an easier to treat image for the following
+steps. The first step is to calculate the HSL representation of the image. HSL (hue, saturation and lightness)
+is another way to represent color spaces, other than RBG. We use the S channel because it is immune to lightness and color
 variations in the image. This is the output of the S channel binary image:
 
-gradient of the image. The Sobel operator is a joint of a Gaussian smoothing and a Canny transform of the image.
 ![Example frame](report_images/s_channel_test3.jpg)
 
 Then, we use the L channel to calculate the [Sobel-Feldman Operator](https://docs.opencv.org/3.0-beta/doc/py_tutorials/py_imgproc/py_gradients/py_gradients.html).
+The Sobel operator is a joint of a Gaussian smoothing and a Canny transform of the image.
 Differently from Canny transform, the Sobel operator can have a derivative direction, so we can consider derivatives in a specific
 orientation. This is the output of the binary Sobel transform on L channel:
 
@@ -110,13 +110,13 @@ The code can be found on [perspective.py](src/perspective.py)
 
 I used a sliding window technique to find where most pixels on each vertical window is,
 and thus, determinate the position of the lane. Then, I fitted these positions to a second-order
-polynomial. I also keep the polynomial parameters of the last 30 fitted polynomials,
-and use the average to display the information to the user. This greatly improved
-the algorithm stability and display clarity.
+polynomial. I also keep the polynomial parameters of the last 30 fitted polynomials
+and use the average to display the information to the user. This greatly improved algorithm 
+stability and display clarity.
 
 The code can be found on ```src/lane_polyfit.py```
 
-### Warping to original image 
+### Warping to the original image 
 I created a solid with the polynomial curves of the evaluated parameters 
 of the current average of the polynomial parameters. The result looks like this:
 
@@ -127,14 +127,14 @@ The code can be found on [lane_polyfit.py](src/lane_polyfit.py)
 ### Parameters
 
 All the parameters of the code are configurable through [config.yaml](config.yaml) file.
-I have implemented a python module that takes care of the paramters and reads the
+I have implemented a python module that takes care of the parameters and reads the
 yaml file when user requests for it.
 
 
 ## Try it yourself
 
 First of all, 
-please follow instructions here to set up your conda environment. Then, on your terminal use:
+please follow the instructions here to set up your conda environment. Then, on your terminal use:
  
 ```bash
 conda activate carnd-term1
@@ -146,7 +146,7 @@ Then, run the [camera_calibration.py](camera_calibration.py)
 python3 camera_calibration.py
 ```
 It will produce the file [calibration.p](camera_cal/calibration.p).
-Then, to get a video output, you can run:
+Then, to get video output, you can run:
 
 ```bash
 python3 project_video.py
