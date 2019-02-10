@@ -1,39 +1,163 @@
 ## Advanced Lane Finding
-[![Udacity - Self-Driving Car NanoDegree](https://s3.amazonaws.com/udacity-sdc/github/shield-carnd.svg)](http://www.udacity.com/drive)
-![Lanes Image](./examples/example_output.jpg)
 
-In this project, your goal is to write a software pipeline to identify the lane boundaries in a video, but the main output or product we want you to create is a detailed writeup of the project.  Check out the [writeup template](https://github.com/udacity/CarND-Advanced-Lane-Lines/blob/master/writeup_template.md) for this project and use it as a starting point for creating your own writeup.  
+In this project, the idea is to improve the approach in 
+[Lane Line Finding](https://github.com/lucascoelhof/CarND-LaneLines-P1) with new techniques learned from
+the [Self-Driving car Engineer Nanodegree from Udacity](https://www.udacity.com/course/self-driving-car-engineer-nanodegree--nd013).
 
-Creating a great writeup:
+![Example frame](report_images/test3.jpg)
+
+You can find a result video [here](https://youtu.be/uV5FKq-Id6s)
+
+# Table of contents
+[Camera Calibration](#camera-calibration)
+* [Image processing pipeline](#image-processing-pipeline)
+    * [Thresholded binary image](#thresholded-binary-image)
+    * [Perspective transform](#perspective-transform)
+    * [Detecting lane pixels](#detecting-lane-pixels)
+    * [Warping to original image](#warping-to-original-image)
+    * [Parameters](#parameters)
+* [Try it yourself](#try-it-yourself)
+
 ---
-A great writeup should include the rubric points as well as your description of how you addressed each point.  You should include a detailed description of the code used in each step (with line-number references and code snippets where necessary), and links to other supporting documents or external references.  You should include images in your writeup to demonstrate how your code works with examples.  
+## Camera calibration
 
-All that said, please be concise!  We're not looking for you to write a book here, just a brief description of how you passed each rubric point, and references to the relevant code :). 
+The first, and very important step in our image processing pipeline is camera calibration.
+This is a step sometimes neglected, but very important to have consistent and correct images.
+Cameras are made with lenses, and because they do not represent a perfect pinhole model, their lenses
+distort the formed image. However, using camera calibration, we can evaluate this distortion and apply
+an undistortion to the image.
 
-You're not required to use markdown for your writeup.  If you use another method please just submit a pdf of your writeup.
+One of ways to calibrate an camera is to prepare a chessboard pattern and take multiple pictures of it, in many
+different angles and positions. You can find these pictures in folder ```camera_cal```. Then assuming (x,y,z) coordinates
+for the chessboard corners and that it is fixed on plane where z=0, we use we use cv2.findChessboardCorners
+to find the correspondent corners in the image and cv2.calibrateCamera to match camera 
+to find the chessboard pattern in the multiple images provided. With this chessboard pattern detected, we then
+use cv2.calibrateCamera to find the camera calibration parameters. For a detailed explanation on how
+camera calibration works in Python, please follow [this tutorial](https://opencv-python-tutroals.readthedocs.io/en/latest/py_tutorials/py_calib3d/py_calibration/py_calibration.html).
 
-The Project
+Generally, you don't have to calibrate your camera all the time. Preferably, you will do it once, then
+store the parameters. Given that, I've separated the camera calibration in a separate script. You can run it using
+
+```
+python3 camera_calibration.py
+``` 
+This script will store a ```calibration.p``` file with the calibration parameters.
+
+With the camera calibration parameters on hand, now we should undistort the image. For that, we can
+reload the parameters from ```calibration.p```, then use cv2.undistort to get the image.
+
+
+Distorced image:
+![Example frame](camera_cal/calibration1.jpg "Distorced image")
+
+Undistorced image:
+![Example frame](report_images/undist_calibration1.jpg "Undistorced image")
+
 ---
 
-The goals / steps of this project are the following:
+## Image processing pipeline
 
-* Compute the camera calibration matrix and distortion coefficients given a set of chessboard images.
-* Apply a distortion correction to raw images.
-* Use color transforms, gradients, etc., to create a thresholded binary image.
-* Apply a perspective transform to rectify binary image ("birds-eye view").
-* Detect lane pixels and fit to find the lane boundary.
-* Determine the curvature of the lane and vehicle position with respect to center.
-* Warp the detected lane boundaries back onto the original image.
-* Output visual display of the lane boundaries and numerical estimation of lane curvature and vehicle position.
+Now, we will go through each step ran at every frame of the video. We start with this example image:
 
-The images for camera calibration are stored in the folder called `camera_cal`.  The images in `test_images` are for testing your pipeline on single frames.  If you want to extract more test images from the videos, you can simply use an image writing method like `cv2.imwrite()`, i.e., you can read the video in frame by frame as usual, and for frames you want to save for later you can write to an image file.  
+![Example frame](report_images/original_test3.jpg)
 
-To help the reviewer examine your work, please save examples of the output from each stage of your pipeline in the folder called `output_images`, and include a description in your writeup for the project of what each image shows.    The video called `project_video.mp4` is the video your pipeline should work well on.  
 
-The `challenge_video.mp4` video is an extra (and optional) challenge for you if you want to test your pipeline under somewhat trickier conditions.  The `harder_challenge.mp4` video is another optional challenge and is brutal!
+### Thresholded binary image
+After undistorting the image, we then proceed to creating a binary thresholded image. In this step, we transform the
+video frame into a binary image (either white or black). We do so in order to get a easier to treat image for the following
+steps. The first step is to calcuate the HSL representation of the image. HSL (hue, saturation and lightness)
+is a other way to represent color spaces, other than RBG. We use the S channel because it is immune to lightness and color
+variations in the image. This is the output of the S channel binary image:
 
-If you're feeling ambitious (again, totally optional though), don't stop there!  We encourage you to go out and take video of your own, calibrate your camera and show us how you would implement this project from scratch!
+gradient of the image. The Sobel operator is a joint of a Gaussian smoothing and a Canny transform of the image.
+![Example frame](report_images/s_channel_test3.jpg)
 
-## How to write a README
-A well written README file can enhance your project and portfolio.  Develop your abilities to create professional README files by completing [this free course](https://www.udacity.com/course/writing-readmes--ud777).
+Then, we use the L channel to calculate the [Sobel-Feldman Operator](https://docs.opencv.org/3.0-beta/doc/py_tutorials/py_imgproc/py_gradients/py_gradients.html).
+Differently from Canny transform, the Sobel operator can have a derivative direction, so we can consider derivatives in a specific
+orientation. This is the output of the binary Sobel transform on L channel:
 
+![Example frame](report_images/sobel_test3.jpg)
+
+Combining both with a AND operator, we get our final thresholded binary image:
+
+![Example frame](report_images/thresh_test3.jpg)
+
+Where lanes are more defined on this final image than on each of them separately.
+
+The code can be found on [thresholding.py](src/thresholding.py)
+
+
+### Perspective transform 
+
+After getting the binary images, we then perform a perspective transform to the image, so we can get a
+birds-eye view of the lanes. This will be useful for detecting the lane curvatures on the next step. 
+For performing the perspective transform, I assumed that the camera is centered on the vehicle and I
+applied a transform which transformed the trapezoid formed by the lanes on the image into destination
+points on the transformed image: 
+
+```yaml
+trapezoid: [[200, 720], [590, 450], [690, 450], [1130, 720]]
+dest_points: [[320, 720], [320, 0], [960, 0], [960, 720]]
+``` 
+This gives the following result on the binary image:
+
+![Example frame](report_images/perspective_test3.jpg)
+
+The code can be found on [perspective.py](src/perspective.py)
+
+
+### Detecting lane pixels
+
+I used a sliding window technique to find where most pixels on each vertical window is,
+and thus, determinate the position of the lane. Then, I fitted these positions to a second-order
+polynomial. I also keep the polynomial parameters of the last 30 fitted polynomials,
+and use the average to display the information to the user. This greatly improved
+the algorithm stability and display clarity.
+
+The code can be found on ```src/lane_polyfit.py```
+
+### Warping to original image 
+I created a solid with the polynomial curves of the evaluated parameters 
+of the current average of the polynomial parameters. The result looks like this:
+
+ ![Example frame](report_images/test3.jpg)
+ 
+The code can be found on [lane_polyfit.py](src/lane_polyfit.py)
+
+### Parameters
+
+All the parameters of the code are configurable through [config.yaml](config.yaml) file.
+I have implemented a python module that takes care of the paramters and reads the
+yaml file when user requests for it.
+
+
+## Try it yourself
+
+First of all, 
+please follow instructions here to set up your conda environment. Then, on your terminal use:
+ 
+```bash
+conda activate carnd-term1
+```
+
+Then, run the [camera_calibration.py](camera_calibration.py)
+
+```bash
+python3 camera_calibration.py
+```
+It will produce the file [calibration.p](camera_cal/calibration.p).
+Then, to get a video output, you can run:
+
+```bash
+python3 project_video.py
+```
+ 
+It will process the video and put it on folder [output_videos](output_videos).
+
+If you want to have the output of each image processing step, you can run:
+
+```bash
+python3 test_images_lane_lines.py
+```
+
+It will output the images of each step of the pipeline on folder [output_images](output_images).

@@ -1,9 +1,5 @@
-import glob
-import pickle
-
 import numpy as np
 import cv2
-import matplotlib.pyplot as plt
 import config
 import collections
 
@@ -162,6 +158,9 @@ def fit_polynomial(binary_warped, undist, minv):
 
     img_shape = binary_warped.shape
     leftx, lefty, rightx, righty, out_img = find_lane_pixels(binary_warped)
+
+    if not leftx.size or not rightx.size:
+        return None
 
     Lane.left.current_fit = np.polyfit(lefty, leftx, 2)
     Lane.right.current_fit = np.polyfit(righty, rightx, 2)
