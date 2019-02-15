@@ -161,3 +161,11 @@ python3 test_images_lane_lines.py
 ```
 
 It will output the images of each step of the pipeline on folder [output_images](output_images).
+
+## Possible improvements
+
+One of the ways we could improve is to use other color space transformations and explore which
+ones could also be suitable for detecting lane lines. Also, the code makes an assumption of
+centimeters per pixel scale when calculating the radius of curvature and position on lane. We 
+could find other ways (with laser scan sensors for example) to measure this value directly and avoid this approximation. 
+

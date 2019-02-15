@@ -4,20 +4,20 @@ y_points: 6
 calibration_filepath: "camera_cal/calibration.p"
 
 # Thresholding
-sobel_thresh: [30, 150]
-s_thresh: [150, 200]
-sobel_kernel: 9
+s_thresh: [30, 150]
+sobel_thresh: [50, 150]
+sobel_kernel: 15
 
 # Perspective transform
 trapezoid: [[200, 720], [590, 450], [690, 450], [1130, 720]]
 dest_points: [[320, 720], [320, 0], [960, 0], [960, 720]]
 
 # Lane finding
-window_width: 50 # for lane finding
+window_width: 50  # for lane finding
 window_height: 80  # Break image into 9 vertical layers since image height is 720
 margin: 100  # How much to slide left and right for searching
 
 # Circle calculation
-bondary_lenght: 30 # meters per pixel in y dimension (30/720 as suggested on lessons)
-lane_width: 3.7 # meters per pixel in x dimension (3.5/700 as suggested on lessons)
+ym_per_pix: 0.041666667  # meters per pixel in y dimension (30/720 as suggested on lessons)
+xm_per_pix: 0.005  # meters per pixel in x dimension (3.5/700 as suggested on lessons)
 

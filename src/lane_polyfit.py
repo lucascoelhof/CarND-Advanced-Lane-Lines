@@ -21,10 +21,12 @@ class Line:
         self.current_fit = [np.array([False])]
         # radius of curvature of the line in some units
         self.radius_of_curvature = None
+        # historical radius of curvature
+        self.hist_curve = collections.deque(maxlen=30)
         # distance in meters of vehicle center from the line
         self.line_base_pos = None
         # difference in fit coefficients between last and new fits
-        self.diffs = np.array([0,0,0], dtype='float')
+        self.diffs = np.array([0, 0, 0], dtype='float')
         # x values for detected line pixels
         self.allx = None
         # y values for detected line pixels
@@ -120,25 +122,38 @@ def find_lane_pixels(binary_warped):
     return leftx, lefty, rightx, righty, out_img
 
 
-def update_curvature(img_shape):
-    bondary_lenght = config.get("bondary_lenght")
-    ym_per_pix = bondary_lenght / img_shape[0]
-    left_y = img_shape[0]
-    right_y = img_shape[0]
-    left_curverad = ((1 + (2 * Lane.left.current_fit[0] * left_y * ym_per_pix + Lane.left.current_fit[1]) ** 2) ** 1.5) / np.absolute(
-        2 * Lane.left.current_fit[0])
-    right_curverad = ((1 + (2 * Lane.right.current_fit[0] * right_y * ym_per_pix + Lane.right.current_fit[1]) ** 2) ** 1.5) / np.absolute(
-        2 * Lane.right.current_fit[0])
-    Lane.left.radius_of_curvature = left_curverad
-    Lane.right.radius_of_curvature = right_curverad
-    Lane.average_radius = (left_curverad + right_curverad)/2
+def update_curvature(ploty, leftx, rightx):
+    y_eval = np.max(ploty)
+    ym_per_pix = config.get("ym_per_pix")
+    xm_per_pix = config.get("xm_per_pix")
+    left_fit_cr = np.polyfit(ploty * ym_per_pix, leftx * xm_per_pix, 2)
+    right_fit_cr = np.polyfit(ploty * ym_per_pix, rightx * xm_per_pix, 2)
+    left_curverad = np.average(1 + (2 * left_fit_cr[0] * y_eval * ym_per_pix + left_fit_cr[1]) ** 2) ** (
+                3 / 2) / np.fabs(2 * left_fit_cr[0])
+    right_curverad = np.average(1 + (2 * right_fit_cr[0] * y_eval * ym_per_pix + right_fit_cr[1]) ** 2) ** (
+                3 / 2) / np.fabs(2 * right_fit_cr[0])
+
+    Lane.left.hist_curve.append(left_curverad)
+    Lane.right.hist_curve.append(right_curverad)
+
+    avg = 0
+    for fit in Lane.left.hist_curve:
+        avg = fit + avg
+    Lane.left.radius_of_curvature = avg / len(Lane.left.hist_curve)
+
+    avg = 0
+    for fit in Lane.right.hist_curve:
+        avg = fit + avg
+    Lane.right.radius_of_curvature = avg / len(Lane.right.hist_curve)
+
+    Lane.average_radius = (left_curverad + right_curverad)
     return left_curverad, right_curverad
 
 
 def find_car_position(img_shape):
-    lane_width = config.get("lane_width")
-    xm_per_pix = lane_width/(Lane.left.recent_xfitted[0] - Lane.right.recent_xfitted[0])
-    return ((Lane.left.recent_xfitted[0] + Lane.right.recent_xfitted[0])/2 - img_shape[1]/2) * xm_per_pix
+    xm_per_pix = config.get("xm_per_pix")
+    pixdist = Lane.left.recent_xfitted[0] - Lane.right.recent_xfitted[0] + img_shape[1]/2
+    return pixdist * xm_per_pix
 
 
 def find_best_fit():
@@ -188,7 +203,7 @@ def fit_polynomial(binary_warped, undist, minv):
     out_img[lefty, leftx] = [255, 0, 0]
     out_img[righty, rightx] = [0, 0, 255]
 
-    update_curvature(img_shape)
+    update_curvature(ploty, left_fitx, right_fitx)
     Lane.car_position = find_car_position(img_shape)
 
     # Create an image to draw the lines on
